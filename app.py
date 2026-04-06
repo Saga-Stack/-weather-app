@@ -9,7 +9,7 @@ from streamlit_autorefresh import st_autorefresh
 API_KEY = "45313509cae2fb08083c689a0a9abbad"
 
 st.set_page_config(layout="wide")
-st.title("🌬 福島 天気＋風速＋気圧＋河川カメラ")
+st.title("そらのめ")
 
 # ===== 凡例 =====
 with st.expander("📘 マークの説明（凡例）"):
