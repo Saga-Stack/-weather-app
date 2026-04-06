@@ -9,7 +9,7 @@ from streamlit_autorefresh import st_autorefresh
 API_KEY = "45313509cae2fb08083c689a0a9abbad"
 
 st.set_page_config(layout="wide")
-st.title("🌬 福島 気象ダッシュボード")
+st.title("そらのめ")
 
 # ===== 凡例 =====
 with st.expander("📘 マークの説明（凡例）"):
@@ -114,7 +114,6 @@ def get_camera_links(lat, lon):
         f"{base}?zm=10&clat={lat}&clon={lon}",
         f"{base}?zm=13&clat={lat}&clon={lon}"
     ]
-
 # ===== タブ =====
 tab1, tab2 = st.tabs(["📍 地図", "🌤 予報"])
 
@@ -125,42 +124,27 @@ with tab1:
     for city, (lat, lon) in cities.items():
         folium.Marker([lat, lon], tooltip=city).add_to(m)
 
-    map_data = st_folium(m, width=700, height=500)
-
-    # ===== クリック取得 =====
-    clicked_lat, clicked_lon = None, None
-    if map_data and map_data.get("last_clicked"):
-        clicked_lat = map_data["last_clicked"]["lat"]
-        clicked_lon = map_data["last_clicked"]["lng"]
+    st_folium(m, width=700, height=500)
 
     selected_city = st.selectbox("地点", list(cities.keys()))
 
-    # ===== 座標統一 =====
-    if clicked_lat and clicked_lon:
-        lat, lon = clicked_lat, clicked_lon
-        selected_label = "クリック地点"
-    else:
-        lat, lon = cities[selected_city]
-        selected_label = selected_city
-
-    # ===== 現在天気 =====
+    lat, lon = cities[selected_city]
     current = get_current(lat, lon)
 
     if "weather" in current:
         p = current["main"]["pressure"]
         w = current["wind"]["speed"]
 
-        st.markdown(f"### 📍 {selected_label}")
         st.markdown(f"<h1 style='color:{pressure_color(p)};'>📉 {p} hPa</h1>", unsafe_allow_html=True)
         st.write(f"🌬 {w} m/s")
 
-    # ===== カメラ =====
-    st.markdown(f"### 📷 {selected_label} 周辺カメラ")
+    st.markdown(f"### 📷 {selected_city} 周辺カメラ")
     for i, link in enumerate(get_camera_links(lat, lon)):
         st.link_button(f"カメラ{i+1}", link)
 
 # ===== 予報 =====
 with tab2:
+    lat, lon = cities[selected_city]
     df = get_forecast(lat, lon)
 
     if not df.empty:
