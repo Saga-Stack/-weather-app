@@ -73,7 +73,10 @@ cities = {
 # ===== API =====
 def safe_request(url):
     try:
-        return requests.get(url, timeout=5).json()
+        res = requests.get(url, timeout=5)
+        if res.status_code != 200 or not res.text:
+            return {}
+        return res.json()
     except:
         return {}
 
@@ -101,19 +104,9 @@ def get_forecast(lat, lon):
     return pd.DataFrame(rows)
 
 # ===== 色 =====
-def wind_color(w):
-    return "#d0f0ff" if w < 3 else "#fff3b0" if w < 6 else "#ff9999"
-
 def pressure_color(p):
     return "red" if p < 990 else "orange" if p < 1000 else "green"
 
-# ===== カメラ =====
-def get_camera_links(lat, lon):
-    base = "https://www.river.go.jp/kawabou/pc/tm"
-    return [
-        f"{base}?zm=10&clat={lat}&clon={lon}",
-        f"{base}?zm=13&clat={lat}&clon={lon}"
-    ]
 # ===== タブ =====
 tab1, tab2 = st.tabs(["📍 地図", "🌤 予報"])
 
@@ -134,13 +127,11 @@ with tab1:
     if "weather" in current:
         p = current["main"]["pressure"]
         w = current["wind"]["speed"]
+        t = current["main"]["temp"]
 
         st.markdown(f"<h1 style='color:{pressure_color(p)};'>📉 {p} hPa</h1>", unsafe_allow_html=True)
-        st.write(f"🌬 {w} m/s")
-
-    st.markdown(f"### 📷 {selected_city} 周辺カメラ")
-    for i, link in enumerate(get_camera_links(lat, lon)):
-        st.link_button(f"カメラ{i+1}", link)
+        st.write(f"🌡 気温: {t} ℃")
+        st.write(f"🌬 風速: {w} m/s")
 
 # ===== 予報 =====
 with tab2:
@@ -162,7 +153,7 @@ with tab2:
             gust = max_w / avg_w if avg_w > 0 else 0
 
             html += f"""
-            <div style="min-width:160px;background:{wind_color(max_w)};margin:5px;padding:10px;border-radius:10px;">
+            <div style="min-width:160px;background:#eee;margin:5px;padding:10px;border-radius:10px;">
                 <h4>{row['time'].strftime('%m/%d %H:%M')}</h4>
                 <img src="http://openweathermap.org/img/wn/{row['icon']}@2x.png">
                 <p>🌬 {avg_w:.1f}</p>
