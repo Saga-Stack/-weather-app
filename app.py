@@ -74,7 +74,37 @@ def safe(url):
         return r.json() if r.status_code == 200 else {}
     except:
         return {}
+# ===== API =====
+def safe(url):
+    try:
+        r = requests.get(url, timeout=5)
+        return r.json() if r.status_code == 200 else {}
+    except:
+        return {}
 
+# ★ここに入れる（重要）
+@st.cache_data(ttl=300)
+def get_place(lat, lon):
+    try:
+        url = (
+            "https://api.openweathermap.org/geo/1.0/reverse"
+            f"?lat={lat}&lon={lon}&limit=1&appid={API_KEY}"
+        )
+        data = safe(url)
+
+        if isinstance(data, list) and len(data) > 0:
+            d = data[0]
+
+            return (
+                d.get("local_names", {}).get("ja")
+                or d.get("name")
+                or "不明地点"
+            )
+
+    except:
+        pass
+
+    return "取得中..."
 # =====================
 # 🔥 地名（安定版：重要修正）
 # =====================
@@ -188,16 +218,14 @@ with col1:
 # CURRENT WEATHER
 # =====================
 with col2:
-    cur = get_current(lat, lon)
+    cur = get_current(lat, lon) or {}
 
-    if cur and "weather" in cur:
         wind = cur.get("wind", {}).get("speed", 0)
         gust = cur.get("wind", {}).get("gust", wind * 1.5)
         temp = cur.get("main", {}).get("temp", 0)
 
         icon = cur.get("weather", [{}])[0].get("icon", "")
         icon_url = f"http://openweathermap.org/img/wn/{icon}@2x.png"
-
         status, cls = drone(wind, gust)
 
         st.markdown(f"""
