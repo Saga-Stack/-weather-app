@@ -73,26 +73,24 @@ def safe(url):
     except:
         return {}
 
-# ★★★ここが修正ポイント（安定版）★★★
+# ===== ★安定版 geocode（キャッシュ付き・座標出さない）=====
+@st.cache_data(ttl=3600)
 def get_place(lat, lon):
     try:
-        # ① OpenWeather
+        # ===== OpenWeather =====
         url1 = (
             "http://api.openweathermap.org/geo/1.0/reverse"
             f"?lat={lat}&lon={lon}&limit=1&appid={API_KEY}"
         )
         data1 = requests.get(url1, timeout=3).json()
 
-        if isinstance(data1, list) and len(data1) > 0:
+        if isinstance(data1, list) and data1:
             p = data1[0]
-            name = (
-                p.get("local_names", {}).get("ja")
-                or p.get("name")
-            )
+            name = p.get("local_names", {}).get("ja") or p.get("name")
             if name:
                 return name
 
-        # ② Nominatim（安定）
+        # ===== Nominatim（安定）=====
         url2 = (
             "https://nominatim.openstreetmap.org/reverse"
             f"?format=json&lat={lat}&lon={lon}&zoom=12&accept-language=ja"
@@ -115,7 +113,8 @@ def get_place(lat, lon):
     except:
         pass
 
-    return f"{lat:.3f}, {lon:.3f}"
+    # ★本質改善：座標は出さない
+    return "不明地点"
 
 
 def get_current(lat, lon):
@@ -244,7 +243,6 @@ with tab1:
 
         df = df.bfill().ffill()
         df["pressure"] = df["pressure"].where(df["pressure"] < 2000)
-
         df["date"] = df["time"].dt.date
 
         for d, g in df.groupby("date"):
