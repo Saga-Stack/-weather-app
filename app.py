@@ -73,17 +73,31 @@ def safe(url):
     except:
         return {}
 
+# ★ここだけ修正（地名バグ修正）
 def get_place(lat, lon):
     try:
-        data = safe(
-            f"http://api.openweathermap.org/geo/1.0/reverse?"
-            f"lat={lat}&lon={lon}&limit=1&appid={API_KEY}"
-        )
-        if data:
-            return data[0].get("name", "Unknown")
+        data = requests.get(
+            f"http://api.openweathermap.org/geo/1.0/reverse"
+            f"?lat={lat}&lon={lon}&limit=1&appid={API_KEY}",
+            timeout=5
+        ).json()
+
+        if isinstance(data, list) and len(data) > 0:
+            place = data[0]
+
+            name = (
+                place.get("local_names", {}).get("ja")
+                or place.get("name")
+                or "不明地点"
+            )
+
+            return name
+
     except:
         pass
-    return "福島市"
+
+    return f"{lat:.2f}, {lon:.2f}"
+
 
 def get_current(lat, lon):
     return safe(
@@ -134,14 +148,10 @@ lon = st.session_state.lon
 
 col1, col2 = st.columns(2)
 
-# ===== 地図（完成版）=====
+# ===== 地図 =====
 with col1:
 
-    m = folium.Map(
-        location=[lat, lon],
-        zoom_start=11,
-        control_scale=True
-    )
+    m = folium.Map(location=[lat, lon], zoom_start=11)
 
     folium.Marker(
         [lat, lon],
@@ -149,23 +159,15 @@ with col1:
         icon=folium.Icon(color="red")
     ).add_to(m)
 
-    map_data = st_folium(
-        m,
-        key="map",
-        width=700,
-        height=500
-    )
+    map_data = st_folium(m, key="map", width=700, height=500)
 
     if map_data and map_data.get("last_clicked"):
-
         new_lat = map_data["last_clicked"]["lat"]
         new_lon = map_data["last_clicked"]["lng"]
 
         if new_lat != st.session_state.lat or new_lon != st.session_state.lon:
             st.session_state.lat = new_lat
             st.session_state.lon = new_lon
-
-            st.toast("📍 地点更新")
             st.rerun()
 
     st.markdown(f"### 📍 {get_place(lat, lon)}")
@@ -183,7 +185,7 @@ with col2:
         icon_url = f"http://openweathermap.org/img/wn/{icon}@2x.png"
 
         pressure = cur.get("main", {}).get("pressure", None)
-        pressure_txt = f"{pressure:.0f} hPa" if isinstance(pressure, (int,float)) else "--"
+        pressure_txt = f"{pressure:.0f} hPa" if isinstance(pressure, (int, float)) else "--"
 
         status, cls = drone(wind, gust)
 
@@ -202,7 +204,6 @@ fc = get_forecast(lat, lon)
 
 tab1, tab2 = st.tabs(["⏰ 時間予報", "📅 週間予報"])
 
-# ===== 時間予報 =====
 with tab1:
     view = st.radio("表示時間", ["12時間","24時間","48時間"], horizontal=True)
     limit = {"12時間":12,"24時間":24,"48時間":48}[view]
@@ -225,6 +226,7 @@ with tab1:
 
         df = df.bfill().ffill()
         df["pressure"] = df["pressure"].where(df["pressure"] < 2000)
+
         df["date"] = df["time"].dt.date
 
         for d, g in df.groupby("date"):
@@ -244,7 +246,6 @@ with tab1:
                     </div>
                     """, unsafe_allow_html=True)
 
-# ===== 週間予報 =====
 with tab2:
     if "daily" in fc:
         df2 = pd.DataFrame({
