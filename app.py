@@ -215,27 +215,31 @@ with col1:
     st.markdown(f"### 📍 {get_place(lat, lon)}")
 
 # =====================
-# CURRENT WEATHER
-# =====================
+# ===== 現在天気 =====
 with col2:
     cur = get_current(lat, lon) or {}
 
-        wind = cur.get("wind", {}).get("speed", 0)
-        gust = cur.get("wind", {}).get("gust", wind * 1.5)
-        temp = cur.get("main", {}).get("temp", 0)
+    wind = cur.get("wind", {}).get("speed", 0)
+    gust = cur.get("wind", {}).get("gust", wind * 1.5)
+    temp = cur.get("main", {}).get("temp", 0)
 
-        icon = cur.get("weather", [{}])[0].get("icon", "")
-        icon_url = f"http://openweathermap.org/img/wn/{icon}@2x.png"
-        status, cls = drone(wind, gust)
+    icon = cur.get("weather", [{}])[0].get("icon", "")
+    icon_url = f"http://openweathermap.org/img/wn/{icon}@2x.png" if icon else "http://openweathermap.org/img/wn/01d@2x.png"
 
-        st.markdown(f"""
-        <div class="card {cls}">
+    pressure = cur.get("main", {}).get("pressure", None)
+    pressure_txt = f"{pressure:.0f} hPa" if isinstance(pressure, (int, float)) else "--"
+
+    status, cls = drone(wind, gust)
+
+    st.markdown(f"""
+    <div class="card {cls}">
         <img src="{icon_url}" width="80">
         <h2>{status}</h2>
         🌬 {wind:.1f} / ⚡ {gust:.1f}<br>
-        🌡 {temp:.1f}℃
-        </div>
-        """, unsafe_allow_html=True)
+        🌡 {temp:.1f}℃<br>
+        📉 {pressure_txt}
+    </div>
+    """, unsafe_allow_html=True)
 
 # =====================
 # FORECAST
