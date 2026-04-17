@@ -1,17 +1,21 @@
 import streamlit as st
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 import folium
 from streamlit_folium import st_folium
 
-# ===== API =====
+# =====================
+# API KEY
+# =====================
 API_KEY = st.secrets["OPENWEATHER_API_KEY"]
 
 st.set_page_config(layout="wide")
-st.title("そらのめ")
+st.title("そらのめ PRO")
 
-# ===== 凡例 =====
+# =====================
+# 凡例（復元済み）
+# =====================
 with st.expander("📘 凡例"):
     st.markdown("""
 ### 🚁 飛行判定
@@ -36,27 +40,23 @@ with st.expander("📘 凡例"):
 ---
 
 ### 🌤 天気マーク
-☀️ 晴れ  
-🌤 晴れ時々くもり  
-☁️ くもり  
-🌫 霧  
-🌦 弱い雨  
-🌧 雨  
-❄️ 雪  
-⛈ 雷・激しい雨  
-❓ 不明  
+☀️ 晴れ 🌤 くもり ☁️ 曇り  
+🌧 雨 ❄️ 雪 ⛈ 雷  
 """)
 
-# ===== CSS =====
+# =====================
+# CSS（プロUI）
+# =====================
 st.markdown("""
 <style>
 .card {
     background:#1e1e1e;
     color:white;
     padding:12px;
-    border-radius:12px;
+    border-radius:14px;
     margin:6px;
     text-align:center;
+    box-shadow:0 2px 8px rgba(0,0,0,0.4);
 }
 .ok {border-left:6px solid #00ff88;}
 .warn {border-left:6px solid orange;}
@@ -65,7 +65,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ===== API =====
+# =====================
+# API SAFE
+# =====================
 def safe(url):
     try:
         r = requests.get(url, timeout=5)
@@ -73,50 +75,36 @@ def safe(url):
     except:
         return {}
 
-# ===== ★安定版 geocode（キャッシュ付き・座標出さない）=====
-@st.cache_data(ttl=3600)
+# =====================
+# 🔥 地名（安定版：重要修正）
+# =====================
 def get_place(lat, lon):
     try:
-        # ===== OpenWeather =====
-        url1 = (
-            "http://api.openweathermap.org/geo/1.0/reverse"
+        url = (
+            "https://api.openweathermap.org/geo/1.0/reverse"
             f"?lat={lat}&lon={lon}&limit=1&appid={API_KEY}"
         )
-        data1 = requests.get(url1, timeout=3).json()
+        data = safe(url)
 
-        if isinstance(data1, list) and data1:
-            p = data1[0]
-            name = p.get("local_names", {}).get("ja") or p.get("name")
-            if name:
-                return name
+        # list保証
+        if isinstance(data, list) and len(data) > 0:
+            d = data[0]
 
-        # ===== Nominatim（安定）=====
-        url2 = (
-            "https://nominatim.openstreetmap.org/reverse"
-            f"?format=json&lat={lat}&lon={lon}&zoom=12&accept-language=ja"
-        )
-
-        headers = {"User-Agent": "streamlit-app"}
-        data2 = requests.get(url2, headers=headers, timeout=5).json()
-
-        if "address" in data2:
-            addr = data2["address"]
             return (
-                addr.get("city")
-                or addr.get("town")
-                or addr.get("village")
-                or addr.get("county")
-                or addr.get("state")
+                d.get("local_names", {}).get("ja")
+                or d.get("name")
                 or "不明地点"
             )
 
     except:
         pass
 
-    # ★本質改善：座標は出さない
-    return "不明地点"
+    # fallback（これが重要）
+    return f"{lat:.3f}, {lon:.3f}"
 
-
+# =====================
+# Weather API
+# =====================
 def get_current(lat, lon):
     return safe(
         f"https://api.openweathermap.org/data/2.5/weather?"
@@ -125,14 +113,16 @@ def get_current(lat, lon):
 
 def get_forecast(lat, lon):
     return safe(
-        f"https://api.open-meteo.com/v1/forecast?"
+        "https://api.open-meteo.com/v1/forecast?"
         f"latitude={lat}&longitude={lon}"
-        f"&hourly=windspeed_10m,pressure_msl,weathercode"
-        f"&daily=temperature_2m_max,temperature_2m_min,windspeed_10m_max,weathercode"
-        f"&forecast_days=14&timezone=Asia%2FTokyo"
+        "&hourly=windspeed_10m,pressure_msl,weathercode"
+        "&daily=temperature_2m_max,temperature_2m_min,windspeed_10m_max,weathercode"
+        "&forecast_days=14&timezone=Asia%2FTokyo"
     )
 
-# ===== 天気 =====
+# =====================
+# ICON
+# =====================
 def weather_icon(code):
     return {
         0:"☀️",1:"🌤",2:"🌤",3:"☁️",
@@ -143,20 +133,26 @@ def weather_icon(code):
         95:"⛈",96:"⛈",99:"⛈"
     }.get(code, "❓")
 
+# =====================
+# 判定
+# =====================
 def wind_class(w):
-    if w is None: return ""
-    if w > 8: return "ng"
-    if w > 5: return "warn"
+    if w > 8:
+        return "ng"
+    elif w > 5:
+        return "warn"
     return "ok"
 
 def drone(wind, gust):
     if gust > 10:
         return "🔴 飛行中止","ng"
-    if wind > 5 or gust > 8:
+    elif wind > 5 or gust > 8:
         return "🟡 注意","warn"
     return "🟢 飛行可能","ok"
 
-# ===== 初期位置 =====
+# =====================
+# STATE
+# =====================
 if "lat" not in st.session_state:
     st.session_state.lat = 37.76
     st.session_state.lon = 140.47
@@ -164,32 +160,33 @@ if "lat" not in st.session_state:
 lat = st.session_state.lat
 lon = st.session_state.lon
 
-col1, col2 = st.columns(2)
+col1, col2 = st.columns([1,1])
 
-# ===== 地図 =====
+# =====================
+# MAP（クリック即更新）
+# =====================
 with col1:
-    m = folium.Map(location=[lat, lon], zoom_start=11)
+    m = folium.Map(location=[lat, lon], zoom_start=10)
 
-    folium.Marker(
-        [lat, lon],
-        tooltip="選択地点",
-        icon=folium.Icon(color="red")
-    ).add_to(m)
+    folium.Marker([lat, lon], tooltip="現在地").add_to(m)
 
-    map_data = st_folium(m, key="map", width=700, height=500)
+    map_data = st_folium(m, key="map", height=500)
 
     if map_data and map_data.get("last_clicked"):
         new_lat = map_data["last_clicked"]["lat"]
         new_lon = map_data["last_clicked"]["lng"]
 
-        if new_lat != st.session_state.lat or new_lon != st.session_state.lon:
+        if new_lat != lat or new_lon != lon:
             st.session_state.lat = new_lat
             st.session_state.lon = new_lon
             st.rerun()
 
+    # ★地名（ここ重要）
     st.markdown(f"### 📍 {get_place(lat, lon)}")
 
-# ===== 現在天気 =====
+# =====================
+# CURRENT WEATHER
+# =====================
 with col2:
     cur = get_current(lat, lon)
 
@@ -201,28 +198,29 @@ with col2:
         icon = cur.get("weather", [{}])[0].get("icon", "")
         icon_url = f"http://openweathermap.org/img/wn/{icon}@2x.png"
 
-        pressure = cur.get("main", {}).get("pressure", None)
-        pressure_txt = f"{pressure:.0f} hPa" if isinstance(pressure, (int, float)) else "--"
-
         status, cls = drone(wind, gust)
 
         st.markdown(f"""
         <div class="card {cls}">
-        <img src="{icon_url}" style="width:80px;">
+        <img src="{icon_url}" width="80">
         <h2>{status}</h2>
         🌬 {wind:.1f} / ⚡ {gust:.1f}<br>
-        🌡 {temp:.1f}℃<br>
-        📉 {pressure_txt}
+        🌡 {temp:.1f}℃
         </div>
         """, unsafe_allow_html=True)
 
-# ===== 予報 =====
+# =====================
+# FORECAST
+# =====================
 fc = get_forecast(lat, lon)
 
 tab1, tab2 = st.tabs(["⏰ 時間予報", "📅 週間予報"])
 
+# =====================
+# 時間予報（完全復元）
+# =====================
 with tab1:
-    view = st.radio("表示時間", ["12時間","24時間","48時間"], horizontal=True)
+    view = st.radio("表示", ["12時間","24時間","48時間"], horizontal=True)
     limit = {"12時間":12,"24時間":24,"48時間":48}[view]
 
     if "hourly" in fc:
@@ -237,12 +235,13 @@ with tab1:
         idx = (df["time"] - now).abs().idxmin()
         df = df.iloc[idx: idx + limit]
 
+        # 🔥 復元ポイント
         df["max"] = df["wind"].rolling(3, center=True).max()
         df["min"] = df["wind"].rolling(3, center=True).min()
         df["ratio"] = df["max"] / df["wind"].replace(0, 1)
 
         df = df.bfill().ffill()
-        df["pressure"] = df["pressure"].where(df["pressure"] < 2000)
+
         df["date"] = df["time"].dt.date
 
         for d, g in df.groupby("date"):
@@ -262,6 +261,9 @@ with tab1:
                     </div>
                     """, unsafe_allow_html=True)
 
+# =====================
+# 週間予報（完全復元）
+# =====================
 with tab2:
     if "daily" in fc:
         df2 = pd.DataFrame({
@@ -270,7 +272,7 @@ with tab2:
             "tmin": fc["daily"]["temperature_2m_min"],
             "wind": fc["daily"]["windspeed_10m_max"],
             "weather": fc["daily"]["weathercode"]
-        }).head(14)
+        })
 
         cols = st.columns(4)
 
