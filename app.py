@@ -73,30 +73,49 @@ def safe(url):
     except:
         return {}
 
-# ★ここだけ修正（地名バグ修正）
+# ★★★ここが修正ポイント（安定版）★★★
 def get_place(lat, lon):
     try:
-        data = requests.get(
-            f"http://api.openweathermap.org/geo/1.0/reverse"
-            f"?lat={lat}&lon={lon}&limit=1&appid={API_KEY}",
-            timeout=5
-        ).json()
+        # ① OpenWeather
+        url1 = (
+            "http://api.openweathermap.org/geo/1.0/reverse"
+            f"?lat={lat}&lon={lon}&limit=1&appid={API_KEY}"
+        )
+        data1 = requests.get(url1, timeout=3).json()
 
-        if isinstance(data, list) and len(data) > 0:
-            place = data[0]
-
+        if isinstance(data1, list) and len(data1) > 0:
+            p = data1[0]
             name = (
-                place.get("local_names", {}).get("ja")
-                or place.get("name")
+                p.get("local_names", {}).get("ja")
+                or p.get("name")
+            )
+            if name:
+                return name
+
+        # ② Nominatim（安定）
+        url2 = (
+            "https://nominatim.openstreetmap.org/reverse"
+            f"?format=json&lat={lat}&lon={lon}&zoom=12&accept-language=ja"
+        )
+
+        headers = {"User-Agent": "streamlit-app"}
+        data2 = requests.get(url2, headers=headers, timeout=5).json()
+
+        if "address" in data2:
+            addr = data2["address"]
+            return (
+                addr.get("city")
+                or addr.get("town")
+                or addr.get("village")
+                or addr.get("county")
+                or addr.get("state")
                 or "不明地点"
             )
-
-            return name
 
     except:
         pass
 
-    return f"{lat:.2f}, {lon:.2f}"
+    return f"{lat:.3f}, {lon:.3f}"
 
 
 def get_current(lat, lon):
@@ -150,7 +169,6 @@ col1, col2 = st.columns(2)
 
 # ===== 地図 =====
 with col1:
-
     m = folium.Map(location=[lat, lon], zoom_start=11)
 
     folium.Marker(
