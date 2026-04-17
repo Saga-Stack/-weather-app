@@ -14,7 +14,7 @@ st.set_page_config(layout="wide")
 st.title("そらのめ PRO")
 
 # =====================
-# 凡例（復元済み）
+# 凡例
 # =====================
 with st.expander("📘 凡例"):
     st.markdown("""
@@ -40,12 +40,11 @@ with st.expander("📘 凡例"):
 ---
 
 ### 🌤 天気マーク
-☀️ 晴れ 🌤 くもり ☁️ 曇り  
-🌧 雨 ❄️ 雪 ⛈ 雷  
+☀️ 🌤 ☁️ 🌧 ❄️ ⛈
 """)
 
 # =====================
-# CSS（プロUI）
+# CSS
 # =====================
 st.markdown("""
 <style>
@@ -56,17 +55,15 @@ st.markdown("""
     border-radius:14px;
     margin:6px;
     text-align:center;
-    box-shadow:0 2px 8px rgba(0,0,0,0.4);
 }
 .ok {border-left:6px solid #00ff88;}
 .warn {border-left:6px solid orange;}
 .ng {border-left:6px solid red;}
-.small {font-size:12px;color:#aaa;}
 </style>
 """, unsafe_allow_html=True)
 
 # =====================
-# API SAFE
+# SAFE API
 # =====================
 def safe(url):
     try:
@@ -74,15 +71,10 @@ def safe(url):
         return r.json() if r.status_code == 200 else {}
     except:
         return {}
-# ===== API =====
-def safe(url):
-    try:
-        r = requests.get(url, timeout=5)
-        return r.json() if r.status_code == 200 else {}
-    except:
-        return {}
 
-# ★ここに入れる（重要）
+# =====================
+# 🔥 地名安定版（重要）
+# =====================
 @st.cache_data(ttl=300)
 def get_place(lat, lon):
     try:
@@ -90,11 +82,11 @@ def get_place(lat, lon):
             "https://api.openweathermap.org/geo/1.0/reverse"
             f"?lat={lat}&lon={lon}&limit=1&appid={API_KEY}"
         )
+
         data = safe(url)
 
         if isinstance(data, list) and len(data) > 0:
             d = data[0]
-
             return (
                 d.get("local_names", {}).get("ja")
                 or d.get("name")
@@ -105,35 +97,9 @@ def get_place(lat, lon):
         pass
 
     return "取得中..."
-# =====================
-# 🔥 地名（安定版：重要修正）
-# =====================
-def get_place(lat, lon):
-    try:
-        url = (
-            "https://api.openweathermap.org/geo/1.0/reverse"
-            f"?lat={lat}&lon={lon}&limit=1&appid={API_KEY}"
-        )
-        data = safe(url)
-
-        # list保証
-        if isinstance(data, list) and len(data) > 0:
-            d = data[0]
-
-            return (
-                d.get("local_names", {}).get("ja")
-                or d.get("name")
-                or "不明地点"
-            )
-
-    except:
-        pass
-
-    # fallback（これが重要）
-    return f"{lat:.3f}, {lon:.3f}"
 
 # =====================
-# Weather API
+# WEATHER
 # =====================
 def get_current(lat, lon):
     return safe(
@@ -163,20 +129,15 @@ def weather_icon(code):
         95:"⛈",96:"⛈",99:"⛈"
     }.get(code, "❓")
 
-# =====================
-# 判定
-# =====================
 def wind_class(w):
-    if w > 8:
-        return "ng"
-    elif w > 5:
-        return "warn"
+    if w > 8: return "ng"
+    if w > 5: return "warn"
     return "ok"
 
 def drone(wind, gust):
     if gust > 10:
         return "🔴 飛行中止","ng"
-    elif wind > 5 or gust > 8:
+    if wind > 5 or gust > 8:
         return "🟡 注意","warn"
     return "🟢 飛行可能","ok"
 
@@ -190,15 +151,14 @@ if "lat" not in st.session_state:
 lat = st.session_state.lat
 lon = st.session_state.lon
 
-col1, col2 = st.columns([1,1])
+col1, col2 = st.columns(2)
 
 # =====================
-# MAP（クリック即更新）
+# MAP
 # =====================
 with col1:
     m = folium.Map(location=[lat, lon], zoom_start=10)
-
-    folium.Marker([lat, lon], tooltip="現在地").add_to(m)
+    folium.Marker([lat, lon]).add_to(m)
 
     map_data = st_folium(m, key="map", height=500)
 
@@ -211,11 +171,11 @@ with col1:
             st.session_state.lon = new_lon
             st.rerun()
 
-    # ★地名（ここ重要）
     st.markdown(f"### 📍 {get_place(lat, lon)}")
 
 # =====================
-# ===== 現在天気 =====
+# CURRENT WEATHER
+# =====================
 with col2:
     cur = get_current(lat, lon) or {}
 
@@ -226,9 +186,6 @@ with col2:
     icon = cur.get("weather", [{}])[0].get("icon", "")
     icon_url = f"http://openweathermap.org/img/wn/{icon}@2x.png" if icon else "http://openweathermap.org/img/wn/01d@2x.png"
 
-    pressure = cur.get("main", {}).get("pressure", None)
-    pressure_txt = f"{pressure:.0f} hPa" if isinstance(pressure, (int, float)) else "--"
-
     status, cls = drone(wind, gust)
 
     st.markdown(f"""
@@ -236,8 +193,7 @@ with col2:
         <img src="{icon_url}" width="80">
         <h2>{status}</h2>
         🌬 {wind:.1f} / ⚡ {gust:.1f}<br>
-        🌡 {temp:.1f}℃<br>
-        📉 {pressure_txt}
+        🌡 {temp:.1f}℃
     </div>
     """, unsafe_allow_html=True)
 
@@ -249,7 +205,7 @@ fc = get_forecast(lat, lon)
 tab1, tab2 = st.tabs(["⏰ 時間予報", "📅 週間予報"])
 
 # =====================
-# 時間予報（完全復元）
+# 時間（完全復元）
 # =====================
 with tab1:
     view = st.radio("表示", ["12時間","24時間","48時間"], horizontal=True)
@@ -267,13 +223,12 @@ with tab1:
         idx = (df["time"] - now).abs().idxmin()
         df = df.iloc[idx: idx + limit]
 
-        # 🔥 復元ポイント
+        # 🔥完全復元
         df["max"] = df["wind"].rolling(3, center=True).max()
         df["min"] = df["wind"].rolling(3, center=True).min()
         df["ratio"] = df["max"] / df["wind"].replace(0, 1)
 
         df = df.bfill().ffill()
-
         df["date"] = df["time"].dt.date
 
         for d, g in df.groupby("date"):
@@ -294,7 +249,7 @@ with tab1:
                     """, unsafe_allow_html=True)
 
 # =====================
-# 週間予報（完全復元）
+# 週間（完全復元）
 # =====================
 with tab2:
     if "daily" in fc:
