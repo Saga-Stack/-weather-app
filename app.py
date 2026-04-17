@@ -45,13 +45,6 @@ with st.expander("📘 凡例"):
 ❄️ 雪  
 ⛈ 雷・激しい雨  
 ❓ 不明  
-
----
-
-### 🧠 補足
-・突風率が高い = 急な風変化あり  
-・風速5m/s以上で注意  
-・突風10m/s以上は飛行NG  
 """)
 
 # ===== CSS =====
@@ -141,20 +134,43 @@ lon = st.session_state.lon
 
 col1, col2 = st.columns(2)
 
-# ===== 地図 =====
+# ===== 地図（完成版）=====
 with col1:
-    m = folium.Map(location=[lat, lon], zoom_start=8)
-    folium.Marker([lat, lon]).add_to(m)
 
-    map_data = st_folium(m, width=700, height=500)
+    m = folium.Map(
+        location=[lat, lon],
+        zoom_start=11,
+        control_scale=True
+    )
+
+    folium.Marker(
+        [lat, lon],
+        tooltip="選択地点",
+        icon=folium.Icon(color="red")
+    ).add_to(m)
+
+    map_data = st_folium(
+        m,
+        key="map",
+        width=700,
+        height=500
+    )
 
     if map_data and map_data.get("last_clicked"):
-        st.session_state.lat = map_data["last_clicked"]["lat"]
-        st.session_state.lon = map_data["last_clicked"]["lng"]
+
+        new_lat = map_data["last_clicked"]["lat"]
+        new_lon = map_data["last_clicked"]["lng"]
+
+        if new_lat != st.session_state.lat or new_lon != st.session_state.lon:
+            st.session_state.lat = new_lat
+            st.session_state.lon = new_lon
+
+            st.toast("📍 地点更新")
+            st.rerun()
 
     st.markdown(f"### 📍 {get_place(lat, lon)}")
 
-# ===== 現在 =====
+# ===== 現在天気 =====
 with col2:
     cur = get_current(lat, lon)
 
@@ -186,7 +202,7 @@ fc = get_forecast(lat, lon)
 
 tab1, tab2 = st.tabs(["⏰ 時間予報", "📅 週間予報"])
 
-# ===== 時間 =====
+# ===== 時間予報 =====
 with tab1:
     view = st.radio("表示時間", ["12時間","24時間","48時間"], horizontal=True)
     limit = {"12時間":12,"24時間":24,"48時間":48}[view]
@@ -228,7 +244,7 @@ with tab1:
                     </div>
                     """, unsafe_allow_html=True)
 
-# ===== 週間 =====
+# ===== 週間予報 =====
 with tab2:
     if "daily" in fc:
         df2 = pd.DataFrame({
