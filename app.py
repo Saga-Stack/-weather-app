@@ -67,36 +67,28 @@ st.markdown("""
 # =====================
 def safe(url):
     try:
-        r = requests.get(url, timeout=5)
+        headers = {"User-Agent": "soranome-app"}  # ←OSM対策追加
+        r = requests.get(url, timeout=5, headers=headers)
         return r.json() if r.status_code == 200 else {}
     except:
         return {}
 
 # =====================
-# 🔥 地名安定版（重要）
+# 🔥 地名（OSM版に差し替え）
 # =====================
 @st.cache_data(ttl=300)
 def get_place(lat, lon):
     try:
         url = (
-            "https://api.openweathermap.org/geo/1.0/reverse"
-            f"?lat={lat}&lon={lon}&limit=1&appid={API_KEY}"
+            "https://nominatim.openstreetmap.org/reverse"
+            f"?lat={lat}&lon={lon}&format=json&accept-language=ja"
         )
-
         data = safe(url)
 
-        if isinstance(data, list) and len(data) > 0:
-            d = data[0]
-            return (
-                d.get("local_names", {}).get("ja")
-                or d.get("name")
-                or "不明地点"
-            )
+        return data.get("display_name", "不明地点")
 
     except:
-        pass
-
-    return "取得中..."
+        return "不明地点"
 
 # =====================
 # WEATHER
@@ -205,7 +197,7 @@ fc = get_forecast(lat, lon)
 tab1, tab2 = st.tabs(["⏰ 時間予報", "📅 週間予報"])
 
 # =====================
-# 時間（完全復元）
+# 時間
 # =====================
 with tab1:
     view = st.radio("表示", ["12時間","24時間","48時間"], horizontal=True)
@@ -223,7 +215,6 @@ with tab1:
         idx = (df["time"] - now).abs().idxmin()
         df = df.iloc[idx: idx + limit]
 
-        # 🔥完全復元
         df["max"] = df["wind"].rolling(3, center=True).max()
         df["min"] = df["wind"].rolling(3, center=True).min()
         df["ratio"] = df["max"] / df["wind"].replace(0, 1)
@@ -249,7 +240,7 @@ with tab1:
                     """, unsafe_allow_html=True)
 
 # =====================
-# 週間（完全復元）
+# 週間
 # =====================
 with tab2:
     if "daily" in fc:
